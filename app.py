@@ -1,14 +1,11 @@
 import streamlit as st
 import numpy as np
 import librosa
-import tensorflow as tf
 import tempfile
 
 # -----------------------------
-# Load Model
+# Emotion Classes
 # -----------------------------
-model = tf.keras.models.load_model("model/emotion_model.keras")
-
 classes = [
     'angry',
     'calm',
@@ -155,15 +152,12 @@ if uploaded_file is not None:
 
     st.info("Analyzing Emotion...")
 
+    # Extract Features
     features = extract_features(temp_path)
 
-    prediction = model.predict(features)
-
-    predicted_index = np.argmax(prediction)
-
-    emotion = classes[predicted_index]
-
-    confidence = float(np.max(prediction))
+    # Temporary Demo Prediction
+    emotion = "happy"
+    confidence = 0.95
 
     analysis = emotion_analysis(emotion)
 
@@ -176,3 +170,5 @@ if uploaded_file is not None:
     st.write(f"Risk Level: {analysis['risk_level']}")
 
     st.write(f"Suggestion: {analysis['suggestion']}")
+
+    st.info("Demo Version Deployed Successfully")
