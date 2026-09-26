@@ -1,1 +1,7 @@
-streamlitnumpylibrosasoundfilescipy
+streamlit
+tensorflow==2.20.0
+keras==3.12.0
+numpy==2.3.4
+librosa==0.11.0
+soundfile
+scipy==1.16.3
