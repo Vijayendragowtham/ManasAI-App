@@ -1,174 +1,154 @@
-import streamlit as st
-import numpy as np
-import librosa
+import os
 import tempfile
 
-# -----------------------------
-# Emotion Classes
-# -----------------------------
-classes = [
-    'angry',
-    'calm',
-    'disgust',
-    'fear',
-    'happy',
-    'neutral',
-    'sad',
-    'surprise'
+import librosa
+import numpy as np
+import streamlit as st
+import tensorflow as tf
+
+CLASSES = [
+    "angry",
+    "calm",
+    "disgust",
+    "fear",
+    "happy",
+    "neutral",
+    "sad",
+    "surprise",
 ]
 
-# -----------------------------
-# Feature Extraction
-# -----------------------------
+MODEL_PATH = os.path.join("model", "emotion_model.keras")
+
+
+@st.cache_resource
+def load_emotion_model():
+    if not os.path.exists(MODEL_PATH):
+        raise FileNotFoundError(f"Model not found: {MODEL_PATH}")
+    return tf.keras.models.load_model(MODEL_PATH)
+
+
 def extract_features(file_path):
-
     y, sr = librosa.load(file_path, sr=None)
-
-    mfcc = librosa.feature.mfcc(
-        y=y,
-        sr=sr,
-        n_mfcc=40
-    )
+    mfcc = librosa.feature.mfcc(y=y, sr=sr, n_mfcc=40)
 
     max_len = 174
-
     if mfcc.shape[1] < max_len:
-
-        pad_width = max_len - mfcc.shape[1]
-
         mfcc = np.pad(
             mfcc,
-            ((0, 0), (0, pad_width)),
-            mode='constant'
+            ((0, 0), (0, max_len - mfcc.shape[1])),
+            mode="constant",
         )
-
     else:
         mfcc = mfcc[:, :max_len]
 
-    mfcc = np.expand_dims(mfcc, axis=-1)
-    mfcc = np.expand_dims(mfcc, axis=0)
-
-    return mfcc
+    return np.expand_dims(np.expand_dims(mfcc, axis=-1), axis=0)
 
 
-# -----------------------------
-# Emotion Analysis
-# -----------------------------
 def emotion_analysis(emotion):
-
     responses = {
-
-        "sad": {
-            "mental_state": "Possible emotional distress",
-            "risk_level": "Medium",
-            "suggestion": "Try deep breathing for 2 minutes."
-        },
-
-        "angry": {
-            "mental_state": "High emotional arousal",
-            "risk_level": "Medium",
-            "suggestion": "Pause and take 5 slow breaths."
-        },
-
-        "fear": {
-            "mental_state": "Anxiety or stress detected",
-            "risk_level": "High",
-            "suggestion": "Focus on slow breathing and talk to someone you trust."
-        },
-
-        "happy": {
-            "mental_state": "Positive emotional state",
-            "risk_level": "Low",
-            "suggestion": "Great! Keep doing what makes you happy."
-        },
-
-        "neutral": {
-            "mental_state": "Emotionally stable",
-            "risk_level": "Low",
-            "suggestion": "Everything seems balanced."
-        },
-
-        "calm": {
-            "mental_state": "Relaxed state",
-            "risk_level": "Low",
-            "suggestion": "Maintain your calm mindset."
-        },
-
-        "disgust": {
-            "mental_state": "Strong negative reaction",
-            "risk_level": "Medium",
-            "suggestion": "Take a short break from the situation."
-        },
-
-        "surprise": {
-            "mental_state": "Unexpected emotional shift",
-            "risk_level": "Low",
-            "suggestion": "Take a moment to process what happened."
-        }
+        "sad": (
+            "Possible emotional distress",
+            "Medium",
+            "Try slow breathing for a few minutes and consider talking to someone you trust.",
+        ),
+        "angry": (
+            "High emotional arousal",
+            "Medium",
+            "Pause, step away briefly, and take several slow breaths.",
+        ),
+        "fear": (
+            "Possible anxiety or stress response",
+            "High",
+            "Focus on slow breathing and consider talking to someone you trust.",
+        ),
+        "happy": (
+            "Positive emotional state",
+            "Low",
+            "Maintain activities and habits that support your well-being.",
+        ),
+        "neutral": (
+            "Neutral emotional state",
+            "Low",
+            "No strong emotional signal was detected from the recording.",
+        ),
+        "calm": (
+            "Relaxed emotional state",
+            "Low",
+            "Maintain your calm mindset.",
+        ),
+        "disgust": (
+            "Strong negative emotional response",
+            "Medium",
+            "Take a short break and give yourself time to process the situation.",
+        ),
+        "surprise": (
+            "Unexpected emotional response",
+            "Low",
+            "Take a moment to process the situation.",
+        ),
     }
+    return responses.get(
+        emotion,
+        ("Unknown", "Unknown", "Unable to generate an interpretation."),
+    )
 
-    return responses.get(emotion)
 
-
-# -----------------------------
-# Streamlit Page Config
-# -----------------------------
 st.set_page_config(
     page_title="ManasAI",
     page_icon="🧠",
-    layout="centered"
+    layout="centered",
 )
 
-# -----------------------------
-# UI
-# -----------------------------
 st.title("🧠 ManasAI")
-
-st.subheader(
-    "AI-Powered Emotional & Mental Health Detection System"
+st.subheader("AI-Powered Emotional & Mental Health Detection System")
+st.write(
+    "Upload a voice recording to analyze speech emotion using MFCC "
+    "features and a TensorFlow/Keras emotion-classification model."
 )
 
-st.write(
-    "Upload an audio file to analyze emotions and mental state."
+st.warning(
+    "ManasAI is an awareness and emotion-analysis prototype, not a medical "
+    "diagnosis or a substitute for professional mental-health care."
 )
 
 uploaded_file = st.file_uploader(
-    "Upload Audio File",
-    type=["wav", "mp3"]
+    "Upload an audio recording",
+    type=["wav", "mp3", "ogg", "m4a"],
 )
 
-# -----------------------------
-# Prediction Section
-# -----------------------------
 if uploaded_file is not None:
-
     st.audio(uploaded_file)
 
-    with tempfile.NamedTemporaryFile(delete=False) as tmp_file:
+    if st.button("Analyze Emotion", type="primary"):
+        temp_path = None
+        try:
+            with tempfile.NamedTemporaryFile(
+                delete=False,
+                suffix=os.path.splitext(uploaded_file.name)[1] or ".wav",
+            ) as tmp:
+                tmp.write(uploaded_file.getbuffer())
+                temp_path = tmp.name
 
-        tmp_file.write(uploaded_file.read())
+            with st.spinner("Loading model and analyzing speech..."):
+                model = load_emotion_model()
+                features = extract_features(temp_path)
+                prediction = model.predict(features, verbose=0)
+                predicted_index = int(np.argmax(prediction[0]))
+                emotion = CLASSES[predicted_index]
+                confidence = float(np.max(prediction[0]))
 
-        temp_path = tmp_file.name
+            mental_state, risk_level, suggestion = emotion_analysis(emotion)
 
-    st.info("Analyzing Emotion...")
+            st.success(f"Detected Emotion: {emotion.upper()}")
+            st.metric("Model Confidence", f"{confidence * 100:.2f}%")
+            st.write(f"**Mental State:** {mental_state}")
+            st.write(f"**Risk Level:** {risk_level}")
+            st.write(f"**Suggestion:** {suggestion}")
 
-    # Extract Features
-    features = extract_features(temp_path)
+        except Exception as exc:
+            st.error("The audio could not be analyzed.")
+            st.exception(exc)
 
-    # Temporary Demo Prediction
-    emotion = "happy"
-    confidence = 0.95
-
-    analysis = emotion_analysis(emotion)
-
-    st.success(f"Detected Emotion: {emotion.upper()}")
-
-    st.write(f"Confidence Score: {confidence:.2f}")
-
-    st.write(f"Mental State: {analysis['mental_state']}")
-
-    st.write(f"Risk Level: {analysis['risk_level']}")
-
-    st.write(f"Suggestion: {analysis['suggestion']}")
-
-    st.info("Demo Version Deployed Successfully")
+        finally:
+            if temp_path and os.path.exists(temp_path):
+                os.remove(temp_path)
