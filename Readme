@@ -1,0 +1,18 @@
+---
+title: ManasAI
+emoji: 🧠
+colorFrom: indigo
+colorTo: purple
+sdk: docker
+app_port: 7860
+pinned: false
+---
+
+# ManasAI
+
+AI-powered emotional and mental health detection prototype. Upload a voice
+recording and the app analyzes speech emotion using MFCC features and a
+TensorFlow/Keras emotion-classification model.
+
+ManasAI is an awareness and emotion-analysis prototype, not a medical
+diagnosis or a substitute for professional mental-health care.
